@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Recherche LinkedIn RH</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+  <style>
+    .background-image {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: url('logo.png') no-repeat center top;
+      background-size: contain;
+      z-index: 0;
+      pointer-events: none;
+    }
+    body { font-family: 'Segoe UI', sans-serif; background-color: #eef1f5; margin: 0; padding: 0; position: relative; z-index: 1; padding-bottom: 30px; }
+    .container { max-width: 800px; margin: 200px auto 50px; background: #fff; padding: 40px; border-radius: 10px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1); position: relative; z-index: 1; }
+    h1 { color: #0077b5; margin-bottom: 30px; }
+    label { font-weight: 600; margin-top: 20px; display: block; }
+    input[type="text"] { width: 100%; padding: 10px; margin-top: 5px; border: 1px solid #ccc; border-radius: 5px; font-size: 16px; }
+    button { background: #0077b5; color: white; border: none; padding: 12px 24px; font-size: 16px; border-radius: 6px; margin-top: 30px; cursor: pointer; transition: background 0.3s; }
+    button:hover:not(:disabled) { background: #005f91; }
+    button:disabled { background: #aaa; }
+    .results { margin-top: 40px; display: none; opacity: 0; transition: opacity 0.5s ease; }
+    .results.visible { display: block; opacity: 1; }
+    table { width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 15px; }
+    th, td { padding: 12px; border: 1px solid #ddd; }
+    th { background: #0077b5; color: white; text-align: left; }
+    td a { color: #0077b5; text-decoration: none; }
+    #loader { display: none; text-align: center; margin-top: 20px; font-style: italic; color: #555; }
+    .footer { text-align: center; padding: 10px 5px; color: #555; font-size: 14px; position: fixed; bottom: 0; left: 0; width: 100%; font-family: 'Segoe UI', sans-serif; background: transparent; box-shadow: none; z-index: 10; user-select: none; }
+    @media (max-width: 600px) {
+      .container { padding: 20px; margin-top: 120px; }
+      table, thead, tbody, th, td, tr { display: block; }
+      th { background: none; color: #0077b5; font-weight: bold; }
+      td { border: none; border-bottom: 1px solid #ddd; padding: 10px 0; }
+    }
+  </style>
+</head>
+<body>
+  <div class="background-image"></div>
+  <div class="container">
+    <h1><i class="fab fa-linkedin"></i> Recherche de Profils LinkedIn</h1>
+    <form id="searchForm">
+      <label for="keywords">🔍 Mots-clés LinkedIn :</label>
+      <input type="text" id="keywords" name="keywords" placeholder="ex: développeur Python Paris" required />
+      <label for="poste_cible">🎯 Poste ciblé :</label>
+      <input type="text" id="poste_cible" name="poste_cible" placeholder="ex: Développeur Web" required />
+      <label for="mots_cles">📌 Mots-clés de pertinence :</label>
+      <input type="text" id="mots_cles" name="mots_cles" placeholder="ex: Python, Django, API" required />
+      <button type="submit"><i class="fas fa-search"></i> Lancer la recherche</button>
+    </form>
+    <div id="loader">⏳ Recherche en cours...</div>
+    <div class="results" id="results">
+      <h2>📋 Résultats</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Nom</th>
+            <th>Poste</th>
+            <th>Entreprise</th>
+            <th>Lien</th>
+            <th>Score</th>
+          </tr>
+        </thead>
+        <tbody id="resultsBody">
+          <!-- Résultats injectés ici -->
+        </tbody>
+      </table>
+      <button id="exportBtn" style="display:none;"><i class="fas fa-file-excel"></i> Exporter en Excel</button>
+    </div>
+  </div>
+  <div class="footer">
+    &copy; 2025 - Outil de recherche LinkedIn simplifié
+  </div>
+  <script>
+    let lastResults = [];
+
+    document.getElementById('searchForm').onsubmit = async function (e) {
+      e.preventDefault();
+      const loader = document.getElementById('loader');
+      loader.style.display = 'block';
+
+      const keywords = document.getElementById('keywords').value;
+      const poste_cible = document.getElementById('poste_cible').value;
+      const mots_cles = document.getElementById('mots_cles').value.split(',').map(s => s.trim());
+
+      try {
+        const response = await fetch('http://localhost:5000/search', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ keywords, poste_cible, mots_cles })
+        });
+
+        const results = await response.json();
+        lastResults = results;
+        afficherResultats(results);
+      } catch (err) {
+        alert("❌ Une erreur est survenue pendant la recherche.");
+      } finally {
+        loader.style.display = 'none';
+      }
+    };
+
+    function afficherResultats(results) {
+      const resultsDiv = document.getElementById('results');
+      const resultsBody = document.getElementById('resultsBody');
+      const exportBtn = document.getElementById('exportBtn');
+      resultsBody.innerHTML = '';
+
+      if (results.length === 0) {
+        resultsBody.innerHTML = `<tr><td colspan="5">Aucun résultat trouvé.</td></tr>`;
+        exportBtn.style.display = "none";
+      } else {
+        results.forEach(profile => {
+          resultsBody.innerHTML += `
+            <tr>
+              <td>${profile.nom}</td>
+              <td>${profile.poste}</td>
+              <td>${profile.entreprise}</td>
+              <td><a href="${profile.lien}" target="_blank" rel="noopener noreferrer">Voir</a></td>
+              <td>${profile.score}</td>
+            </tr>
+          `;
+        });
+        exportBtn.style.display = "inline-block";
+      }
+
+      resultsDiv.classList.add('visible');
+    }
+
+    document.getElementById('exportBtn').onclick = async function () {
+      const response = await fetch('http://localhost:5000/export', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ results: lastResults })
+      });
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'profils_linkedin.xlsx';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+    };
+  </script>
+</body>
+</html>
